@@ -1,0 +1,12 @@
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Helm local artifacts
+*.tgz
+Chart.lock
+
+# Temp / backup files
+*.swp
+*.bak

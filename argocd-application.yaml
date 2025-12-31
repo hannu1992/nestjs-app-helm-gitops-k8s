@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nestjs-app
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/hannu1992/nestjs-app-helm-gitops-k8s.git
+    targetRevision: main
+    path: helm/nestjs-app
+    helm:
+      valueFiles:
+        - values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nestjs
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
