@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: hannumannamdev1992/nestjs-app
-  tag: "REPLACE_ME"
+  tag: "303d588"
   pullPolicy: IfNotPresent
 
 service:
