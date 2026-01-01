@@ -1,129 +1,131 @@
-## Purpose of this Repository
-Store Helm charts for Kubernetes deployment
-Act as the single source of truth for cluster state
-Be continuously reconciled by Argo CD
+## NestJS GitOps Deployment with Helm & Argo CD
+This project demonstrates a production-style GitOps workflow to deploy a NestJS application on Kubernetes using Helm and Argo CD.
 
-Enable safe, auditable, Git-based deployments
+### Repositories
+Application (CI builds image)
+👉 https://github.com/hannu1992/nestjs-app
 
-### 🧱 Architecture Overview
+GitOps / Deployment (this repo)
+👉 https://github.com/hannu1992/nestjs-app-helm-gitops-k8s
+
+### Tools Used
+- Git & GitHub
+- GitHub Actions (CI)
+- Docker
+- Kubernetes (Minikube)
+- Helm
+- Argo CD
+- NestJS
+
+### How to Run This Project (Actual Steps)
+#### Start Kubernetes (Minikube)
 ```
-Application Repo (nestjs-app)
-  └─ CI (GitHub Actions)
-      ├─ test & build
-      ├─ build Docker image
-      └─ push image to registry
-
-GitOps Repo (this repo)
-  ├─ Helm chart
-  ├─ image tag in values.yaml
-  └─ Argo CD Application
-
-Argo CD
-  └─ Watches GitOps repo
-  └─ Renders Helm chart
-  └─ Syncs state to Kubernetes
+- minikube start
+- kubectl get nodes
 ```
 
-### 📂 Repository Structure
+#### Install Argo CD
 ```
-nestjs-app-helm-gitops-k8s/
-├── argocd-application.yaml        # Argo CD Application definition
-├── helm/
-│   └── nestjs-app/
-│       ├── Chart.yaml             # Helm chart metadata
-│       ├── values.yaml            # Configurable values (image tag, replicas, resources)
-│       └── templates/
-│           ├── deployment.yaml    # Kubernetes Deployment template
-│           └── service.yaml       # Kubernetes Service template
-└── README.md
+kubectl create namespace argocd
+kubectl apply -n argocd -f \
+https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
-### ⚙️ Helm Chart Details
-#### Chart.yaml
 
-Chart name, version, and metadata
-Used by Helm for packaging and versioning
-values.yaml (most important file)
-This is where deploy-time configuration lives.
+Wait until all pods are running:
+```
+kubectl get pods -n argocd
+```
 
+### Deploy via GitOps
+From this repository root:
+```
+kubectl apply -f argocd-application.yaml
+```
+Verify:
+```
+kubectl get applications -n argocd
+```
+
+### Deploy a New Application Version (Real GitOps Action)
+Edit:
+```
+helm/nestjs-app/values.yaml
+```
+Update the Docker image tag (must exist in Docker Hub):
 ```
 image:
   repository: hannumannamdev1992/nestjs-app
-  tag: "REPLACE_ME"
+  tag: "3fa4c1b"
+```
+Commit & push:
+```
+git add helm/nestjs-app/values.yaml
+git commit -m "deploy new image version"
+git push
 ```
 
+### Argo CD automatically syncs the cluster.
 
-### 🔁 Updating image.tag triggers a new deployment via Argo CD.
+### Verify Deployment
+```
+kubectl get pods -n nestjs
+```
+Expected:
+- Running
 
-Templates
-deployment.yaml
-Uses Helm templating
-Configures:
-replicas
-resources
-liveness & readiness probes
+### Access the Application
+```
+kubectl port-forward svc/nestjs-app -n nestjs 3000:80
+```
 
-#### service.yaml
+Test:
+```
+curl http://localhost:3000/health
+```
 
-### Exposes the application inside the cluster
+Expected:
 
-### 🔄 GitOps Workflow
-- Developer pushes code to application repo
+{ "status": "ok" }
+
+#### What Happens Automatically
 - CI builds & pushes Docker image
-- Image tag is updated in values.yaml (manually or via automation)
-- Commit is pushed to this GitOps repo
-- Argo CD detects change
-- Argo CD renders Helm chart
-- Kubernetes state is reconciled automatically
+- Git change updates values.yaml
+- Argo CD detects the change
+- Helm renders Kubernetes manifests
+- Cluster state is reconciled
+- Pods restart with new image
 
-### 🚦 Argo CD Application
-- argocd-application.yaml tells Argo CD:
-- Which repo to watch
-- Which Helm chart to deploy
-- Which namespace to deploy into
+No manual deployment.
+No kubectl in CI.
+No SSH.
 
-To enable auto-sync, prune, and self-heal
-```
-syncPolicy:
-  automated:
-    prune: true
-    selfHeal: true
-```
+### Health Checks
+Application exposes:
 
-### 🩺 Health Checks
-
-The application exposes:
 ```
 GET /health
 ```
 
-Used by:
-- Kubernetes livenessProbe
-- Kubernetes readinessProbe
+Used by Kubernetes:
+- livenessProbe
+- readinessProbe
 
-This ensures:
-- Traffic is sent only to healthy pods
-- Containers are restarted if unhealthy
+Ensures traffic is routed only to healthy pods.
 
-### 🚀 Deployment Requirements
-- Kubernetes cluster (Minikube / EKS / AKS / GKE)
-- Argo CD installed
-- Docker image available in registry
-- Correct image tag set in values.yaml
+### How to Test GitOps Behavior
+- Set a wrong image tag in values.yaml
+- Push change
+- Pods go ImagePullBackOff
+- Fix tag
+- Push again
+- Argo CD auto-heals the deployment
+- This validates GitOps in practice.
 
-### 🔐 Security & Best Practices
-- No secrets stored in this repo
-- No CI pipelines in this repo
-- No kubectl usage in CI
-- All changes are auditable via Git history
+### Rollback Strategy
+Rollback is done via Git:
+```
+git revert <commit>
+git push
+```
 
-### 🎯 Key Principles Followed
-- CI ≠ CD
-- Git is the source of truth
-- Declarative over imperative
-- Infrastructure changes via pull requests
-- Argo CD continuously reconciles state
-
-### 📝 Summary
-
-This repository implements a GitOps-based Kubernetes deployment using Helm and Argo CD.
-Application builds are handled by CI, while this repo declaratively defines how the app runs in the cluster.
+Argo CD automatically restores the previous working version.
